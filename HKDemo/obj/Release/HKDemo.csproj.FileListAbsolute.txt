@@ -1,0 +1,8 @@
+D:\HKDemo\HKDemo\bin\Release\HKDemo.exe
+D:\HKDemo\HKDemo\bin\Release\HKDemo.pdb
+D:\HKDemo\HKDemo\obj\Release\ResolveAssemblyReference.cache
+D:\HKDemo\HKDemo\obj\Release\HKDemo.Form1.resources
+D:\HKDemo\HKDemo\obj\Release\HKDemo.Properties.Resources.resources
+D:\HKDemo\HKDemo\obj\Release\HKDemo.csproj.GenerateResource.Cache
+D:\HKDemo\HKDemo\obj\Release\HKDemo.exe
+D:\HKDemo\HKDemo\obj\Release\HKDemo.pdb
