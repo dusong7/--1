@@ -42,7 +42,9 @@ namespace HKDemo
                     
                 }
                 comdedata(tembyte, 15);                
-            }      
+            }
+            fileread.Close();
+      //      file = new System.IO.FileStream(logpath, FileMode.OpenOrCreate,FileAccess.ReadWrite);
         }
         private bool m_bInitSDK = false;
         private Int32 m_lUserID = -1;//用户ID
@@ -276,7 +278,7 @@ namespace HKDemo
             folderBrowserDialog1.Description = @"选择保存文件的文件夹";
             if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
             {
-                filepath.Text = folderBrowserDialog1.SelectedPath;            
+                filepath.Text = folderBrowserDialog1.SelectedPath;
 
             }
             System.IO.FileStream file1;
@@ -348,7 +350,7 @@ namespace HKDemo
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(ex.Message);
+              //  MessageBox.Show(ex.Message);
             }
             
         }
@@ -364,35 +366,69 @@ namespace HKDemo
             }
         }
         public delegate void UpdateListBoxCallback(byte [] a,int len );
-
+        static int len = 0;
+        byte[] recvdata = new byte[40];
+        private List<byte> buffer = new List<byte>(4096);
          //通过串口取数据
          private void SynReceiveData()
          {
-             byte[] recvbyte = new byte[400];
-             int len = comport.BytesToRead; 
+           
              try
              {
-                 if (len>0)
+                 int recvlen = 0;               
+                 recvlen = comport.BytesToRead;
+                 byte[] recvbyte = new byte[recvlen];
+                 if (recvlen > 0)
                  {
-                     comport.Read(recvbyte, 0, len);
-                     savedata(recvbyte, len);
+                     comport.Read(recvbyte, 0, recvlen);
+                     buffer.AddRange(recvbyte);
+               //      savedata(recvbyte, len);
                     
-               //      MessageBox.Show(Thread.CurrentThread.ManagedThreadId.ToString());
+               ////      MessageBox.Show(Thread.CurrentThread.ManagedThreadId.ToString());
+               //      if (listView1.InvokeRequired)
+               //      {
+               //          byte[] paras = new byte[100];
+               //          Array.Copy(recvbyte, paras, len);
+               //          listView1.BeginInvoke(new UpdateListBoxCallback(comdedata), paras,len); 
+               //      }
+               //      else { 
+               //          comdedata(recvbyte, len); 
+               //      }
+                     
+                 }
+                 while (buffer.Count >= 15)
+                 {
+                     if (buffer[0] != 0x24)
+                     {
+                         buffer.RemoveRange(0, 1);
+                     }
+                     else
+                         break;
+
+                 }
+                 while (buffer.Count>=15)
+                 {
+              
+                     buffer.CopyTo(0,recvdata,0,15);
+                     buffer.RemoveRange(0, 15);
+                     savedata(recvdata, 15);
                      if (listView1.InvokeRequired)
                      {
                          byte[] paras = new byte[100];
-                         Array.Copy(recvbyte, paras, len);
-                         listView1.BeginInvoke(new UpdateListBoxCallback(comdedata), paras,len); 
+                         Array.Copy(recvdata, paras, 15);
+                         listView1.BeginInvoke(new UpdateListBoxCallback(comdedata), paras, 15);
                      }
-                     else { 
-                         comdedata(recvbyte, len); 
+                     else
+                     {
+                         comdedata(recvdata, 15);
                      }
-                     
                  }
+
+
              }
              catch (Exception ex)
              {
-                 MessageBox.Show(ex.Message);
+               //  MessageBox.Show(ex.Message);
              }
          }
          static int vehnum=0;
@@ -409,9 +445,26 @@ namespace HKDemo
              {
                 lane = a[i*15+1];
                 length = a[i * 15 + 2] * 1000 + a[i * 15 + 3] * 100 + a[i * 15 + 4] * 10 + a[i * 15 + 5];
+                if (length < 100)
+                {
+                    i++;
+                    continue;
+                }
+                 
                 width = a[i * 15 + 6]*1000 + a[i * 15 + 7] *100+ a[i * 15 + 8]*10+ a[i * 15 + 9];
+                 if (width>300)
+                 {
+                     i++;
+                     continue;
+                 }
                 higth = a[i * 15 + 10]*1000+ a[i * 15 + 11]*100+a[i * 15 + 12]*10+ a[i * 15 + 13];
+                 if (higth>450)
+                 {
+                     i++;
+                     continue;
+                 }
                 vehnum++;
+               
                 ListViewItem item = new ListViewItem(vehnum.ToString());
                 item.SubItems.Add(lane.ToString());
                 item.SubItems.Add(length.ToString());
@@ -434,7 +487,24 @@ namespace HKDemo
         
         private void savedata( byte[] a,int len)
         {
-            
+            //file.Close();
+            //file = new System.IO.FileStream(logpath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            //if (file != null && file.CanWrite)
+            //{
+            //}
+            //else
+            //{
+            //    file = new System.IO.FileStream(logpath, FileMode.OpenOrCreate|FileMode.Append, FileAccess.ReadWrite);
+            //    // file = System.IO.File.Open(logpath, FileMode.OpenOrCreate|FileMode.CreateNew);
+            //}
+            if (len<10)
+            {
+                return;
+            }
+            if ((a[2]*1000 + a[3]*100 + a[4]*10 +a[5]) < 100)
+                return;
+           
+            file.Close();
             StringBuilder strb = new StringBuilder();
             if (savepath != "")
             {
@@ -443,12 +513,12 @@ namespace HKDemo
                 {
                     strb.Append(a[i].ToString("X2"));
                 }
+               
                 string hexstring = strb.ToString();
-                StreamWriter filewrite = new StreamWriter(file);
+                StreamWriter filewrite = new StreamWriter(logpath,true);
                 filewrite.WriteLine(hexstring);
-                filewrite.Flush();
-
-
+                filewrite.Flush();               
+                filewrite.Close();
             }
            
         }
@@ -470,6 +540,19 @@ namespace HKDemo
 
                       int aa = System.Int32.Parse(listView1.Items[i].SubItems[2].Text) + 10;
                       listView1.Items[i].SubItems[2].Text = string.Format("{0}", aa);
+
+
+                      int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                      string str1 = string.Format("40{0:D2}", lanenum);
+                      int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                      str1 += intToStr(aa);
+                      int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                      str1 += intToStr(width);
+                      int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                      str1 += intToStr(hight);
+                      str1 += "40";
+                      changeLine(i, str1);
+
                 }
                  
             }
@@ -485,6 +568,18 @@ namespace HKDemo
 
                     int aa = System.Int32.Parse(listView1.Items[i].SubItems[2].Text) - 10;
                     listView1.Items[i].SubItems[2].Text = string.Format("{0}", aa);
+
+
+                    int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                    string str1 = string.Format("40{0:D2}", lanenum);
+                    int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                    str1 += intToStr(aa);
+                    int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                    str1 += intToStr(width);
+                    int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                    str1 += intToStr(hight);
+                    str1 += "40";
+                    changeLine(i, str1);
                 }
 
             }
@@ -500,6 +595,17 @@ namespace HKDemo
 
                     int aa = System.Int32.Parse(listView1.Items[i].SubItems[3].Text) + 5;
                     listView1.Items[i].SubItems[3].Text = string.Format("{0}", aa);
+
+                    int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                    string str1 = string.Format("40{0:D2}", lanenum);
+                    int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                    str1 += intToStr(length);
+                    int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                    str1 += intToStr(aa);
+                    int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                    str1 += intToStr(hight);
+                    str1 += "40";
+                    changeLine(i, str1);
                 }
 
             }
@@ -515,6 +621,18 @@ namespace HKDemo
 
                     int aa = System.Int32.Parse(listView1.Items[i].SubItems[3].Text) - 5;
                     listView1.Items[i].SubItems[3].Text = string.Format("{0}", aa);
+
+
+                    int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                    string str1 = string.Format("40{0:D2}", lanenum);
+                    int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                    str1 += intToStr(length);
+                    int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                    str1 += intToStr(aa);
+                    int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                    str1 += intToStr(hight);
+                    str1 += "40";
+                    changeLine(i, str1);
                 }
 
             }
@@ -530,6 +648,17 @@ namespace HKDemo
 
                     int aa = System.Int32.Parse(listView1.Items[i].SubItems[4].Text) + 5;
                     listView1.Items[i].SubItems[4].Text = string.Format("{0}", aa);
+
+                    int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                    string str1 = string.Format("40{0:D2}", lanenum);
+                    int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                    str1 += intToStr(length);
+                    int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                    str1 += intToStr(width);
+                    int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                    str1 += intToStr(aa);
+                    str1 += "40";
+                    changeLine(i, str1);
                 }
 
             }
@@ -538,6 +667,7 @@ namespace HKDemo
         private void highsub(object sender, EventArgs e)
         {
             int num = listView1.Items.Count;
+            
             for (int i = 0; i < num; i++)
             {
                 if (listView1.Items[i].Selected)
@@ -545,12 +675,100 @@ namespace HKDemo
 
                     int aa = System.Int32.Parse(listView1.Items[i].SubItems[4].Text) - 5;
                     listView1.Items[i].SubItems[4].Text = string.Format("{0}", aa);
+
+                     
+                    int lanenum = System.Int32.Parse(listView1.Items[i].SubItems[1].Text);
+                    string str1 = string.Format("40{0:D2}", lanenum);
+                    int length = System.Int32.Parse(listView1.Items[i].SubItems[2].Text);
+                    str1 += intToStr(length);                    
+                    int width = System.Int32.Parse(listView1.Items[i].SubItems[3].Text);
+                    str1 += intToStr(width);
+                    int hight = System.Int32.Parse(listView1.Items[i].SubItems[4].Text);
+                    str1 += intToStr(aa);
+                    str1 += "40";
+                    changeLine(i, str1);
                 }
 
             }
 
         }
+        List<string> linelist = new List<string>();
+        private void changeLine(int line, string str)
+        {
+           try
+           {
+               
+               if (file != null  && file.CanWrite)
+               {
+               }
+               else
+               {
+                   file = new System.IO.FileStream(logpath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                  // file = System.IO.File.Open(logpath, FileMode.OpenOrCreate|FileMode.CreateNew);
+               }
+               
+               StreamReader sr = new StreamReader(file);
+             
+               int row = 0;
+              
+               while (!sr.EndOfStream)
+               {
 
+                   if (row == line)
+                   {
+                       sr.ReadLine();
+                       linelist.Add(str);
+                   }
+                   else
+                   {
+                       
+                       linelist.Add(sr.ReadLine());
+                   }
+               
+                   row++;
+               }
+               sr.Close();
+               StreamWriter sw = new StreamWriter(logpath, false);
+               foreach(string s in linelist)
+               {
+                   if (!s.Equals(""))
+                   {
+                       sw.WriteLine(s);
+                   }   
+               }
+               sw.Flush();
+               sw.Close();
+               linelist.Clear();
+           }
+           catch (System.Exception ex)
+           {
+           	 
+           }
+        
+
+        }
+        private string intToStr(int num)
+        {
+
+            string restr="";
+            int tempnum = num /1000;
+            string tempstr = string.Format("{0:D2}", tempnum);
+
+            restr = tempstr;
+            num = num - tempnum*1000;
+            tempnum = num / 100;
+            tempstr = string.Format("{0:D2}", tempnum);
+            restr += tempstr;
+            num = num - tempnum*100;
+            tempnum = num / 10;
+            tempstr = string.Format("{0:D2}", tempnum);
+            restr += tempstr;
+            num = num - tempnum * 10;
+            tempnum = num;
+            tempstr = string.Format("{0:D2}", tempnum);
+            restr += tempstr;
+            return restr;
+        }
        
         private void SureClose(object sender, FormClosingEventArgs e)
         {
